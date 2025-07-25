@@ -1,19 +1,55 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WanderLust</title>
-  </head>
-  <body>
-    <h3>All Listings</h3>
-    <form method="GET" action="/listings/new">
-      <button>Create New Listing</button>
-    </form>
-    <ul>
-      <% for(let listing of allListings) { %>
-      <li><a href="/listings/<%= listing._id %>"> <%= listing.title %> </a></li>
-      <% } %>
-    </ul>
-  </body>
-</html>
+<% layout("/layouts/boilerplate") %>
+
+<!-- Hover effect style injected in index.ejs only -->
+<style>
+  .card {
+    transition: transform 0.3s ease, background-color 0.3s ease;
+  }
+
+  .card:hover {
+    transform: scale(1.03);
+    background-color: rgba(255, 255, 255, 0.9);
+    filter: brightness(80%);
+  }
+</style>
+
+<h3 class="text-center mb-4">All Listings</h3>
+
+<div class="row row-cols-lg-3 row-cols-md-2 row-cols-sm-1 g-4 px-4">
+  <% for(let listing of allListings) { %>
+    <div class="col">
+      <a href="/listings/<%= listing._id %>" class="text-decoration-none text-dark">
+        <div class="card h-100 shadow-sm">
+          <img src="<%= listing.image.url %>" class="card-img-top" style="height: 20rem; object-fit: cover;" alt="<%= listing.title %>">
+          <div class="card-body">
+            <h5 class="card-title fw-bold"><%= listing.title %></h5>
+            <p class="mb-1">&#8377; <b><%= listing.price.toLocaleString("en-IN") %>/night</b></p>
+            <p class="card-text text-muted"><%= listing.location %>, <%= listing.country %></p>
+          </div>
+        </div>
+      </a>
+    </div>
+  <% } %>
+</div>
+
+
+<!-- Bootstrap form validation script -->
+<script>
+  (function () {
+    'use strict';
+
+    // Get all forms with class "needs-validation"
+    const forms = document.querySelectorAll('.needs-validation');
+
+    // Loop over them and prevent submission if invalid
+    Array.from(forms).forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        if (!form.checkValidity()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+      }, false);
+    });
+  })();
+</script>

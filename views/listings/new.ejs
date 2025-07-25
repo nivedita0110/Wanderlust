@@ -1,37 +1,72 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WanderLust</title>
-  </head>
-  <body>
+
+<% layout("/layouts/boilerplate") %>
+
+<div class="row">
+  <div class="col-8 offset-2">
+    <br>
     <h3>Create a New Listing</h3>
-    <form method="POST" action="/listings">
-      <input name="listing[title]" placeholder="enter title" type="text" />
-      <br /><br />
-      <textarea
-        name="listing[description]"
-        placeholder="enter description"
-      ></textarea>
-      <br /><br />
-      <input
-        name="listing[image]"
-        placeholder="enter image URL/Link"
-        type="text"
-      />
-      <br /><br />
-      <input name="listing[price]" placeholder="enter price" type="number" />
-      <br /><br />
-      <input name="listing[country]" placeholder="enter country" type="text" />
-      <br /><br />
-      <input
-        name="listing[location]"
-        placeholder="enter location"
-        type="text"
-      />
-      <br /><br />
-      <button>Add</button>
+    <form method="POST" action="/listings" novalidate class="needs-validation" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="title" class="form-label">Title</label>
+        <input name="listing[title]" id="title" placeholder="Enter title" type="text" class="form-control" required />
+        <div class="invalid-feedback">Please enter a title.</div>
+      </div>
+
+      <div class="mb-3">
+        <label for="description" class="form-label">Description</label>
+        <textarea name="listing[description]" id="description" placeholder="Enter description" class="form-control" required></textarea>
+        <div class="invalid-feedback">Please enter a description.</div>
+      </div>
+
+      
+      <div class="mb-3">
+        <label for="image" class="form-label">upload Image</label>
+        <input name="listing[image]" id="image" type="file" class="form-control" />
+      </div>
+
+      <div class="row">
+        <div class="mb-3 col-md-4">
+          <label for="price" class="form-label">Price</label>
+          <input name="listing[price]" id="price" placeholder="Enter price" type="number" class="form-control" required />
+          <div class="invalid-feedback">Please enter a price.</div>
+        </div>
+
+        <div class="mb-3 col-md-8">
+          <label for="country" class="form-label">Country</label>
+          <input name="listing[country]" id="country" placeholder="Enter country" type="text" class="form-control" required />
+          <div class="invalid-feedback">Please enter a country.</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="location" class="form-label">Location</label>
+        <input name="listing[location]" id="location" placeholder="Enter location" type="text" class="form-control" required />
+        <div class="invalid-feedback">Please enter a location.</div>
+      </div>
+
+      <button type="submit" class="btn btn-dark add-btn">Add</button>
     </form>
-  </body>
-</html>
+    <br>
+  </div>
+</div>
+
+<!-- Bootstrap form validation script -->
+<script>
+  (function () {
+    'use strict';
+
+    // Get all forms with class "needs-validation"
+    const forms = document.querySelectorAll('.needs-validation');
+
+    // Loop over them and prevent submission if invalid
+    Array.from(forms).forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        if (!form.checkValidity()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+      }, false);
+    });
+  })();
+</script>

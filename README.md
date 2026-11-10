@@ -1,9 +1,20 @@
-# Wanderlust
+# Wanderlust 🌍
 
-A full-stack travel listing app where users can post, view, and review vacation stays.
+A full-stack travel listing platform where users can explore vacation stays, create their own property listings, and share reviews and ratings.
 
-- 🌍 Map integration with Mapbox
-- 📸 Image upload via Cloudinary
-- 🔐 Auth system with Passport.js
-- 🧾 Reviews & rating system
-- 💾 Built with Node.js, Express, MongoDB, EJS, and Bootstrap
+## Features
+
+- 🌍 **Interactive Maps:** Location-based maps using Mapbox.
+- 📸 **Image Uploads:** Cloudinary integration for image storage.
+- 🔐 **User Authentication:** Secure login and registration using Passport.js.
+- 🧾 **Reviews & Ratings:** Users can share feedback and rate properties.
+- 🏡 **Property Listings:** Create, view, edit, and manage vacation stay listings.
+
+## Tech Stack
+
+- **Frontend:** EJS, Bootstrap, HTML, CSS, JavaScript
+- **Backend:** Node.js, Express.js
+- **Database:** MongoDB
+- **Authentication:** Passport.js
+- **Image Storage:** Cloudinary
+- **Maps & Geocoding:** Mapbox

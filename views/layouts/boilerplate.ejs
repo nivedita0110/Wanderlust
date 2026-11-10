@@ -18,15 +18,15 @@
   <%- include("../includes/navbar.ejs") %>
 
   <div class="container mt-3">
-    <% if (success && success.length > 0) { %>
+    <% if (typeof success !== "undefined" && success && success.length > 0) { %>
       <div class="alert alert-success alert-dismissible fade show col-6 offset-3" role="alert">
         <%= success %>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     <% } %>
 
-    <% if (error && error.length > 0) { %>
-      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <% if (typeof error !== "undefined" && error && error.length > 0) { %>
+      <div class="alert alert-danger alert-dismissible fade show col-6 offset-3" role="alert">
         <%= error %>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>

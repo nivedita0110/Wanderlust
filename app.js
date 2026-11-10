@@ -2,6 +2,21 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
+// 1. Validate required environment variables
+const requiredEnvVars = [
+  "ATLASDB_URL",
+  "SECRET",
+  "MAP_TOKEN",
+  "CLOUD_NAME",
+  "CLOUD_API_KEY",
+  "CLOUD_API_SECRET",
+];
+const missingEnvVars = requiredEnvVars.filter((env) => !process.env[env]);
+if (missingEnvVars.length > 0) {
+  console.error(`❌ Missing required environment variable(s): ${missingEnvVars.join(", ")}`);
+  throw new Error(`Missing required environment variable(s): ${missingEnvVars.join(", ")}`);
+}
+
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
@@ -13,12 +28,12 @@ const ExpressError = require("./utils/ExpressError.js");
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
 const session = require("express-session");
-const MongoStore = require('connect-mongo');
+const MongoStore = require("connect-mongo");
 const flash = require("connect-flash");
 const cookieParser = require("cookie-parser");
 const multer = require("multer");
 const mbxGeocoding = require("@mapbox/mapbox-sdk/services/geocoding");
-const dbUrl=process.env.ATLASDB_URL;
+const dbUrl = process.env.ATLASDB_URL;
 const User = require("./models/user.js");
 const Listing = require("./models/listing.js");
 const Review = require("./models/review.js");
@@ -30,7 +45,6 @@ const mapToken = process.env.MAP_TOKEN;
 const geocodingClient = mbxGeocoding({ accessToken: mapToken });
 
 // DB connection
-
 mongoose.connect(dbUrl)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.error("❌ MongoDB Error:", err));
@@ -44,23 +58,27 @@ app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(cookieParser());
 
-
-const store=MongoStore.create({
-  mongoUrl:dbUrl,
+const store = MongoStore.create({
+  mongoUrl: dbUrl,
   crypto: {
-    secret:"mysupersecretcode",
+    secret: process.env.SECRET,
   },
-  touchAfter: 24* 3600,
+  touchAfter: 24 * 3600,
 });
+
+store.on("error", (err) => {
+  console.error("❌ Error in Mongo Session Store:", err);
+});
+
 // Session & flash
 const sessionOptions = {
   store,
-  secret: "mysupersecretcode",
+  secret: process.env.SECRET,
   resave: false,
   saveUninitialized: true,
   cookie: {
     httpOnly: true,
-    expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 };
@@ -76,7 +94,7 @@ passport.deserializeUser(User.deserializeUser());
 
 // Globals
 app.use((req, res, next) => {
-  res.locals.currentUser = req.user;
+  res.locals.currentUser = req.user || null;
   res.locals.success = req.flash("success");
   res.locals.error = req.flash("error");
   next();
@@ -86,23 +104,70 @@ app.use((req, res, next) => {
 const saveRedirectUrl = (req, res, next) => {
   if (req.session.redirectUrl) {
     res.locals.redirectUrl = req.session.redirectUrl;
+    delete req.session.redirectUrl;
   }
   next();
 };
 
 const isLoggedIn = (req, res, next) => {
   if (!req.isAuthenticated()) {
-    req.session.redirectUrl = req.originalUrl;
+    if (req.method === "GET") {
+      req.session.redirectUrl = req.originalUrl;
+    }
     req.flash("error", "You must be logged in!");
     return res.redirect("/user/login");
   }
   next();
 };
 
+const isOwner = wrapAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const listing = await Listing.findById(id);
+  if (!listing) {
+    req.flash("error", "Listing not found.");
+    return res.redirect("/listings");
+  }
+  const currentUserId = res.locals.currentUser?._id || req.user?._id;
+  if (!listing.owner || !listing.owner.equals(currentUserId)) {
+    req.flash("error", "You don't have permission to do that!");
+    return res.redirect(`/listings/${id}`);
+  }
+  next();
+});
+
+const isReviewAuthor = wrapAsync(async (req, res, next) => {
+  const { id, reviewId } = req.params;
+  const listing = await Listing.findById(id);
+  if (!listing) {
+    req.flash("error", "Listing not found.");
+    return res.redirect("/listings");
+  }
+
+  const review = await Review.findById(reviewId);
+  if (!review) {
+    req.flash("error", "Review not found.");
+    return res.redirect(`/listings/${id}`);
+  }
+
+  // Verify that the review belongs to the listing in the URL
+  const reviewBelongsToListing = listing.reviews && listing.reviews.some((r) => r.equals(reviewId));
+  if (!reviewBelongsToListing) {
+    req.flash("error", "This review does not belong to the specified listing!");
+    return res.redirect(`/listings/${id}`);
+  }
+
+  const currentUserId = res.locals.currentUser?._id || req.user?._id;
+  if (!review.author || !review.author.equals(currentUserId)) {
+    req.flash("error", "You are not the author of this review!");
+    return res.redirect(`/listings/${id}`);
+  }
+  next();
+});
+
 const validateListing = (req, res, next) => {
   const { error } = listingSchema.validate(req.body);
   if (error) {
-    const msg = error.details.map(el => el.message).join(",");
+    const msg = error.details.map((el) => el.message).join(",");
     throw new ExpressError(msg, 400);
   }
   next();
@@ -111,16 +176,16 @@ const validateListing = (req, res, next) => {
 const validateReview = (req, res, next) => {
   const { error } = reviewSchema.validate(req.body);
   if (error) {
-    const msg = error.details.map(el => el.message).join(",");
+    const msg = error.details.map((el) => el.message).join(",");
     throw new ExpressError(msg, 400);
   }
   next();
 };
 
 // Routes
-// app.get("/", (req, res) => {
-//   res.send("Hi, I am root");
-// });
+app.get("/", (req, res) => {
+  res.redirect("/listings");
+});
 
 app.get("/listings", wrapAsync(async (req, res) => {
   const allListings = await Listing.find({});
@@ -136,21 +201,39 @@ app.post("/listings",
   upload.single("listing[image]"),
   validateListing,
   wrapAsync(async (req, res) => {
-    const geoData = await geocodingClient
-      .forwardGeocode({
-        query: req.body.listing.location,
-        limit: 1
-      })
-      .send();
+    let geometry = {
+      type: "Point",
+      coordinates: [0, 0]
+    };
+
+    try {
+      const geoData = await geocodingClient
+        .forwardGeocode({
+          query: req.body.listing.location,
+          limit: 1
+        })
+        .send();
+
+      if (geoData && geoData.body && geoData.body.features && geoData.body.features.length > 0 && geoData.body.features[0].geometry) {
+        geometry = geoData.body.features[0].geometry;
+      }
+    } catch (err) {
+      console.error("Mapbox geocoding error:", err.message);
+    }
 
     const listing = new Listing(req.body.listing);
     listing.owner = req.user._id;
-    listing.geometry = geoData.body.features[0].geometry;
+    listing.geometry = geometry;
 
     if (req.file) {
       listing.image = {
         url: req.file.path,
         filename: req.file.filename
+      };
+    } else {
+      listing.image = {
+        url: "https://images.unsplash.com/photo-1625505826533-5c80aca7d157?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60",
+        filename: "listingimage"
       };
     }
 
@@ -175,7 +258,7 @@ app.get("/listings/:id", wrapAsync(async (req, res) => {
   }
 
   // Defensive check
-  if (!listing.geometry || !listing.geometry.coordinates) {
+  if (!listing.geometry || !listing.geometry.coordinates || listing.geometry.coordinates.length === 0) {
     listing.geometry = {
       type: "Point",
       coordinates: [0, 0], // Default fallback
@@ -185,31 +268,58 @@ app.get("/listings/:id", wrapAsync(async (req, res) => {
   res.render("listings/show", { listing });
 }));
 
-
-app.get("/listings/:id/edit", isLoggedIn, wrapAsync(async (req, res) => {
-  const listing = await Listing.findById(req.params.id);
-  if (!listing) throw new ExpressError("Listing not found.", 404);
+app.get("/listings/:id/edit", isLoggedIn, isOwner, wrapAsync(async (req, res) => {
+  const { id } = req.params;
+  const listing = await Listing.findById(id);
+  if (!listing) {
+    req.flash("error", "Listing not found.");
+    return res.redirect("/listings");
+  }
   res.render("listings/edit", { listing });
 }));
 
-// ✅ FIXED: Edit route updates geometry too
 app.put("/listings/:id",
   isLoggedIn,
+  isOwner,
   upload.single("listing[image]"),
   validateListing,
   wrapAsync(async (req, res) => {
     const { id } = req.params;
+    const listing = await Listing.findById(id);
+    if (!listing) {
+      req.flash("error", "Listing not found.");
+      return res.redirect("/listings");
+    }
 
-    const geoData = await geocodingClient
-      .forwardGeocode({
-        query: req.body.listing.location,
-        limit: 1
-      })
-      .send();
+    let geometry = listing.geometry;
+    try {
+      const geoData = await geocodingClient
+        .forwardGeocode({
+          query: req.body.listing.location,
+          limit: 1
+        })
+        .send();
 
-    const listing = await Listing.findByIdAndUpdate(id, req.body.listing, { new: true });
+      if (geoData && geoData.body && geoData.body.features && geoData.body.features.length > 0 && geoData.body.features[0].geometry) {
+        geometry = geoData.body.features[0].geometry;
+      }
+    } catch (err) {
+      console.error("Mapbox geocoding error:", err.message);
+    }
 
-    listing.geometry = geoData.body.features[0].geometry;
+    if (!geometry || !geometry.coordinates || geometry.coordinates.length === 0) {
+      geometry = {
+        type: "Point",
+        coordinates: [0, 0]
+      };
+    }
+
+    listing.title = req.body.listing.title;
+    listing.description = req.body.listing.description;
+    listing.price = req.body.listing.price;
+    listing.location = req.body.listing.location;
+    listing.country = req.body.listing.country;
+    listing.geometry = geometry;
 
     if (req.file) {
       listing.image = {
@@ -225,8 +335,13 @@ app.put("/listings/:id",
   })
 );
 
-app.delete("/listings/:id", isLoggedIn, wrapAsync(async (req, res) => {
-  await Listing.findByIdAndDelete(req.params.id);
+app.delete("/listings/:id", isLoggedIn, isOwner, wrapAsync(async (req, res) => {
+  const { id } = req.params;
+  const deletedListing = await Listing.findByIdAndDelete(id);
+  if (!deletedListing) {
+    req.flash("error", "Listing not found.");
+    return res.redirect("/listings");
+  }
   req.flash("success", "Listing deleted.");
   res.redirect("/listings");
 }));
@@ -279,6 +394,10 @@ app.post("/listings/:id/reviews",
   validateReview,
   wrapAsync(async (req, res) => {
     const listing = await Listing.findById(req.params.id);
+    if (!listing) {
+      req.flash("error", "Listing not found.");
+      return res.redirect("/listings");
+    }
     const review = new Review(req.body.review);
     review.author = req.user._id;
     await review.save();
@@ -291,14 +410,24 @@ app.post("/listings/:id/reviews",
 
 app.delete("/listings/:id/reviews/:reviewId",
   isLoggedIn,
+  isReviewAuthor,
   wrapAsync(async (req, res) => {
     const { id, reviewId } = req.params;
-    await Review.findByIdAndDelete(reviewId);
     await Listing.findByIdAndUpdate(id, { $pull: { reviews: reviewId } });
+    await Review.findByIdAndDelete(reviewId);
     req.flash("success", "Review deleted.");
     res.redirect(`/listings/${id}`);
   })
 );
+
+// Informational routes for footer links
+app.get("/privacy", (req, res) => {
+  res.send("<h1>Privacy Policy</h1><p>Wanderlust is committed to protecting your privacy.</p><a href='/listings'>Back to Listings</a>");
+});
+
+app.get("/terms", (req, res) => {
+  res.send("<h1>Terms of Service</h1><p>Welcome to Wanderlust. Please review our terms and conditions.</p><a href='/listings'>Back to Listings</a>");
+});
 
 // Error handling
 app.all("*", (req, res, next) => {
@@ -306,14 +435,20 @@ app.all("*", (req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
+  if (res.headersSent) {
+    return next(err);
+  }
   const { statusCode = 500 } = err;
   if (!err.message) err.message = "Something went wrong";
   res.status(statusCode).render("error", { err });
 });
 
 // Server
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
 
+module.exports = app;

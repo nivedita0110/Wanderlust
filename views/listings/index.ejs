@@ -20,10 +20,10 @@
     <div class="col">
       <a href="/listings/<%= listing._id %>" class="text-decoration-none text-dark">
         <div class="card h-100 shadow-sm">
-          <img src="<%= listing.image.url %>" class="card-img-top" style="height: 20rem; object-fit: cover;" alt="<%= listing.title %>">
+          <img src="<%= listing.image?.url || 'https://images.unsplash.com/photo-1625505826533-5c80aca7d157?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60' %>" class="card-img-top" style="height: 20rem; object-fit: cover;" alt="<%= listing.title %>">
           <div class="card-body">
             <h5 class="card-title fw-bold"><%= listing.title %></h5>
-            <p class="mb-1">&#8377; <b><%= listing.price.toLocaleString("en-IN") %>/night</b></p>
+            <p class="mb-1">&#8377; <b><%= listing.price != null ? listing.price.toLocaleString("en-IN") : "N/A" %>/night</b></p>
             <p class="card-text text-muted"><%= listing.location %>, <%= listing.country %></p>
           </div>
         </div>
